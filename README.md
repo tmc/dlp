@@ -14,3 +14,7 @@ eval `make env`
 echo "Andrew Yang <yanggang@gmail.com>" | redact
 ```
 
+Should result in:
+```sh
+xxx <xxx>
+```

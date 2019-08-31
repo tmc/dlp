@@ -9,7 +9,6 @@ import (
 	"os"
 
 	dlp "cloud.google.com/go/dlp/apiv2"
-	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/xerrors"
 	dlppb "google.golang.org/genproto/googleapis/privacy/dlp/v2"
 )
@@ -42,9 +41,30 @@ func redact(ctx context.Context, input io.Reader) error {
 		return err
 	}
 
-	req := &dlppb.InspectContentRequest{
-		// TODO: Fill request struct fields.
+	// Holy indentation batman.
+	req := &dlppb.DeidentifyContentRequest{
 		Parent: fmt.Sprintf("projects/%v", os.Getenv("PROJECT_ID")),
+		DeidentifyConfig: &dlppb.DeidentifyConfig{
+			Transformation: &dlppb.DeidentifyConfig_InfoTypeTransformations{
+				InfoTypeTransformations: &dlppb.InfoTypeTransformations{
+					Transformations: []*dlppb.InfoTypeTransformations_InfoTypeTransformation{
+						{
+							PrimitiveTransformation: &dlppb.PrimitiveTransformation{
+								Transformation: &dlppb.PrimitiveTransformation_ReplaceConfig{
+									ReplaceConfig: &dlppb.ReplaceValueConfig{
+										NewValue: &dlppb.Value{
+											Type: &dlppb.Value_StringValue{
+												StringValue: "xxx",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		Item: &dlppb.ContentItem{
 			DataItem: &dlppb.ContentItem_ByteItem{
 				ByteItem: &dlppb.ByteContentItem{
@@ -53,11 +73,11 @@ func redact(ctx context.Context, input io.Reader) error {
 			},
 		},
 	}
-	resp, err := c.InspectContent(ctx, req)
+	resp, err := c.DeidentifyContent(ctx, req)
 	if err != nil {
-		return xerrors.Errorf("issue inspecting client: %w", err)
+		return xerrors.Errorf("issue redacting: %w", err)
 	}
-	spew.Dump(resp)
+	fmt.Println(string(resp.GetItem().GetByteItem().GetData()))
 	return nil
 }
 
