@@ -8,6 +8,7 @@ Getting started:
 go get github.com/tmc/dlp/...
 cd $(go env gopath)/src/github.com/tmc/dlp
 make service-account
+make service-account-permissions
 eval `make env`
 
 echo "Andrew Yang <yanggang@gmail.com>" | redact

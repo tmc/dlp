@@ -27,6 +27,7 @@ func redact(ctx context.Context) error {
 
 	req := &dlppb.InspectContentRequest{
 		// TODO: Fill request struct fields.
+		Parent: fmt.Sprintf("projects/%v", os.Getenv("PROJECT_ID")),
 	}
 	resp, err := c.InspectContent(ctx, req)
 	if err != nil {
