@@ -1,3 +1,4 @@
+// Command redact strips personally identifiable information (PII) from input.
 package main
 
 import (
