@@ -11,10 +11,10 @@ make service-account
 make service-account-permissions
 eval `make env`
 
-echo "Andrew Yang <yanggang@gmail.com>" | redact
+echo "I might make a contribution to Andrew Yang <yanggang@gmail.com>" | redact-pii
 ```
 
 Should result in:
 ```sh
-xxx <xxx>
+I might make a contribution to [redacted] <[redacted]>
 ```
