@@ -1,5 +1,6 @@
 builds:
 - id: detect-pii
+  binary: detect-pii
   main: ./cmd/detect-pii
   goarch:
     - amd64
