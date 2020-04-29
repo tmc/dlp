@@ -1,0 +1,24 @@
+name: detect-pii
+descriptions: Attempts to detect PII (personally identifiable informtion).
+outputs:
+  pii-findings:
+    description: "A list of files that may contain PII"
+inputs:
+  github_token:
+    description: 'GITHUB_TOKEN.'
+    default: '${{ github.token }}'
+  level:
+    description: 'Report level for reviewdog [info,warning,error]'
+    default: 'warning'
+  reporter:
+    description: 'Reporter of reviewdog command [github-pr-check,github-pr-review].'
+    default: 'github-check'
+  diff:
+    description: 'git diff command'
+    default: 'git diff --name-only origin/master...'
+runs:
+  using: docker
+  image: Dockerfile
+branding:
+  icon: 'edit'
+  color: 'gray-dark'
