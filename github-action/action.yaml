@@ -1,0 +1,5 @@
+name: detect-pii
+descriptions: Attempts to detect PII (personally identifiable informtion).
+runs:
+  using: docker
+  image: Dockerfile
