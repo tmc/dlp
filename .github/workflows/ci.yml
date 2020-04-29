@@ -17,6 +17,12 @@ jobs:
     runs-on: ubuntu-16.04
     steps:
     - uses: actions/checkout@v2
+    - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+      with:
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        service_account_email: ${{ secrets.GCP_SA_EMAIL }}
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        export_default_credentials: true
     - uses: ./github-action
       with:
         github_token: ${{ secrets.github_token }}

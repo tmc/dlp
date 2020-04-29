@@ -1,5 +1,7 @@
 #!/bin/bash
 set -x
+export REVIEWDOG_GITHUB_API_TOKEN="${INPUT_GITHUB_TOKEN}"
+git fetch origin master
 files=$(eval "${INPUT_DIFF}")
 (
 for f in $files; do
