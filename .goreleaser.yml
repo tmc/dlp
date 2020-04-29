@@ -2,6 +2,8 @@ builds:
 - id: detect-pii
   binary: detect-pii
   main: ./cmd/detect-pii
+  env:
+    - CGO_ENABLED=0
   goarch:
     - amd64
     - 386
