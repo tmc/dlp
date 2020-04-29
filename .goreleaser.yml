@@ -1,0 +1,16 @@
+builds:
+- id: detect-pii
+  main: ./cmd/detect-pii
+  goarch:
+    - amd64
+    - 386
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
