@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-16.04
     steps:
     - uses: actions/checkout@v2
-    - uses: tmc/dlp/github-action@tmc-ci
+    - uses: ./github-action
       with:
-        go-version: '1.14'
-    - run: find .
+        github_token: ${{ secrets.github_token }}
