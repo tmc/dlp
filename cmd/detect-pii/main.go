@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -16,7 +17,8 @@ import (
 	dlppb "google.golang.org/genproto/googleapis/privacy/dlp/v2"
 )
 
-var ErrFindingsPresent = fmt.Errorf("detect-pii: findings present")
+// ErrFindingsPresent is a sentinal error to indicate findings are present.
+var ErrFindingsPresent = errors.New("detect-pii: findings present")
 
 type detectConfig struct {
 	Filename   string
@@ -86,6 +88,7 @@ func getGCPProjectID(ctx context.Context) string {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "issue looking up default credentials:", err)
 		}
+		fmt.Printf("%+v\n", credentials)
 		projectID = credentials.ProjectID
 	}
 	return projectID
@@ -107,6 +110,7 @@ func (dc *detectConfig) detect(ctx context.Context) error {
 		Item: &dlppb.ContentItem{
 			DataItem: &dlppb.ContentItem_ByteItem{
 				ByteItem: &dlppb.ByteContentItem{
+					Type: dlppb.ByteContentItem_TEXT_UTF8,
 					Data: dc.Content,
 				},
 			},
@@ -177,6 +181,7 @@ func (dc *detectConfig) redact(ctx context.Context) error {
 		Item: &dlppb.ContentItem{
 			DataItem: &dlppb.ContentItem_ByteItem{
 				ByteItem: &dlppb.ByteContentItem{
+					Type: dlppb.ByteContentItem_TEXT_UTF8,
 					Data: dc.Content,
 				},
 			},
