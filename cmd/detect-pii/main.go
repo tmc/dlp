@@ -1,4 +1,4 @@
-// Command redact strips personally identifiable information (PII) from input.
+// Command redact-pii strips personally identifiable information (PII) from input.
 package main
 
 import (
@@ -17,14 +17,22 @@ import (
 	dlppb "google.golang.org/genproto/googleapis/privacy/dlp/v2"
 )
 
-// ErrFindingsPresent is a sentinal error to indicate findings are present.
-var ErrFindingsPresent = errors.New("detect-pii: findings present")
+var (
+
+	// ErrFindingsPresent is a sentinal error to indicate findings are present.
+	ErrFindingsPresent = errors.New("detect-pii: findings present")
+	// ErrMissingProjectID is a sentinal error to indicate a missing project ID.
+	ErrMissingProjectID = errors.New("detect-pii: missing project ID")
+)
 
 type detectConfig struct {
 	Filename   string
 	Likelihood string
 	InfoTypes  []*dlppb.InfoType
 	Verbosity  int
+
+	Redact    bool
+	ImageMode bool
 
 	Content    []byte
 	LineStarts []int
@@ -44,54 +52,66 @@ func main() {
 		Filename:   *flagFilename,
 		Likelihood: *flagLiklihood,
 		Verbosity:  *flagVerbosity,
+
+		Redact:    *flagRedact,
+		ImageMode: *flagImage,
 	}
 	for _, it := range strings.Split(*flagInfoTypes, ",") {
 		c.InfoTypes = append(c.InfoTypes, &dlppb.InfoType{Name: it})
 	}
+	if err := run(c); err != nil {
+		if errors.Is(err, ErrFindingsPresent) {
+			os.Exit(2)
+		}
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run(c *detectConfig) error {
 	input, err := fileToReader(c.Filename)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, fmt.Errorf("issue opening input: %w", err))
-		os.Exit(1)
+		return fmt.Errorf("issue opening input: %w", err)
 	}
 	c.Content, err = ioutil.ReadAll(input)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, fmt.Errorf("issue reading input: %w", err))
-		os.Exit(1)
+		return fmt.Errorf("issue reading input: %w", err)
 	}
 
 	ctx := context.Background()
 	rfunc := c.detect
-	if *flagRedact {
+	if c.Redact {
 		rfunc = c.redact
-		if *flagImage {
+		if c.ImageMode {
 			rfunc = c.redactImage
 		}
 	}
 
 	if err := rfunc(ctx); err != nil {
 		if err == ErrFindingsPresent {
-			if *flagVerbosity == 1 {
-				fmt.Fprintln(os.Stderr, fmt.Errorf("%w: %v", err, *flagFilename))
+			if c.Verbosity == 1 {
+				fmt.Fprintln(os.Stderr, "findings present:", c.Filename)
 			}
-			os.Exit(2)
-		} else {
-			fmt.Fprintln(os.Stderr, err)
 		}
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
 
-func getGCPProjectID(ctx context.Context) string {
+func getGCPProjectID(ctx context.Context) (string, error) {
 	projectID := os.Getenv("GCP_PROJECT")
 	if projectID == "" {
+		fmt.Println("empty pid")
 		credentials, err := google.FindDefaultCredentials(ctx)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "issue looking up default credentials:", err)
 		}
-		fmt.Printf("%+v\n", credentials)
 		projectID = credentials.ProjectID
 	}
-	return projectID
+	if projectID == "" {
+		return "", ErrMissingProjectID
+	}
+	return projectID, nil
 }
 
 func (dc *detectConfig) detect(ctx context.Context) error {
@@ -100,9 +120,13 @@ func (dc *detectConfig) detect(ctx context.Context) error {
 		return fmt.Errorf("issue creating client: %w", err)
 	}
 
+	projectID, err := getGCPProjectID(ctx)
+	if err != nil {
+		return err
+	}
 	// Assemble inspection request.
 	req := &dlppb.InspectContentRequest{
-		Parent: fmt.Sprintf("projects/%v", getGCPProjectID(ctx)),
+		Parent: fmt.Sprintf("projects/%v", projectID),
 		InspectConfig: &dlppb.InspectConfig{
 			InfoTypes:     dc.InfoTypes,
 			MinLikelihood: dlppb.Likelihood(dlppb.Likelihood_value[dc.Likelihood]),
@@ -167,10 +191,14 @@ func (dc *detectConfig) redact(ctx context.Context) error {
 		return fmt.Errorf("issue creating client: %w", err)
 	}
 
+	projectID, err := getGCPProjectID(ctx)
+	if err != nil {
+		return err
+	}
 	transformation := redactionTransformation()
 	// Holy indentation batman.
 	req := &dlppb.DeidentifyContentRequest{
-		Parent: fmt.Sprintf("projects/%v", getGCPProjectID(ctx)),
+		Parent: fmt.Sprintf("projects/%v", projectID),
 		DeidentifyConfig: &dlppb.DeidentifyConfig{
 			Transformation: &dlppb.DeidentifyConfig_InfoTypeTransformations{
 				InfoTypeTransformations: &dlppb.InfoTypeTransformations{
@@ -217,8 +245,12 @@ func (dc *detectConfig) redactImage(ctx context.Context) error {
 		})
 	}
 
+	projectID, err := getGCPProjectID(ctx)
+	if err != nil {
+		return err
+	}
 	req := &dlppb.RedactImageRequest{
-		Parent: fmt.Sprintf("projects/%v", getGCPProjectID(ctx)),
+		Parent: fmt.Sprintf("projects/%v", projectID),
 		InspectConfig: &dlppb.InspectConfig{
 			InfoTypes:     dc.InfoTypes,
 			MinLikelihood: dlppb.Likelihood(dlppb.Likelihood_value[dc.Likelihood]),
@@ -241,14 +273,8 @@ func (dc *detectConfig) redactImage(ctx context.Context) error {
 func redactionTransformation() *dlppb.InfoTypeTransformations_InfoTypeTransformation {
 	return &dlppb.InfoTypeTransformations_InfoTypeTransformation{
 		PrimitiveTransformation: &dlppb.PrimitiveTransformation{
-			Transformation: &dlppb.PrimitiveTransformation_ReplaceConfig{
-				ReplaceConfig: &dlppb.ReplaceValueConfig{
-					NewValue: &dlppb.Value{
-						Type: &dlppb.Value_StringValue{
-							StringValue: "[redacted]",
-						},
-					},
-				},
+			Transformation: &dlppb.PrimitiveTransformation_ReplaceWithInfoTypeConfig{
+				ReplaceWithInfoTypeConfig: &dlppb.ReplaceWithInfoTypeConfig{},
 			},
 		},
 	}
